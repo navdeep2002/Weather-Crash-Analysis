@@ -37,3 +37,40 @@ MONTH_NUMBERS = {
   "DECEMBER": 12,
 }
 
+# we created 2 helper functions for changing column names to uppercase and also determining which city a weather file represents
+
+def clean_text_columns(data, columns):
+
+  # using a for loop we will remove trailing spaces, and rename the column names to uppercase
+  # we will not remove any missing values because even missing values can affect the bias of data, as taught in lectures
+
+  for column in columns:
+    data[column] = (data[column].astype("string").str.strip().str.upper())
+
+    return data
+
+
+def city_from_weather_filename(filename):
+
+  # we will determine which municipality the weather file represents using some if statements
+  # I decided to make this a separate helper function in order to not clutter up the code, if I hadn't
+  # I included the space after city names just because the raw data set filenames have a space after the city name
+
+  if filename.startswith("Van "):
+
+    return "VANCOUVER"
+
+    if filename.startswith("Richmond "):
+
+      return "RICHMOND"
+
+    if filename.startswith("Delta "):
+
+      return "DELTA"
+
+    if filename.startswith("Abbotsford "):
+
+      return "ABBOTSFORD"
+
+    raise ValueError(f"Unknown weather filename: {filename}") # this is basically the else clause but for a ValueError for error handling
+
