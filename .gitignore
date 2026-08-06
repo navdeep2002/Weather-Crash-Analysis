@@ -1,0 +1,13 @@
+# personal editor settings
+
+.vscode/
+
+# python generated files 
+
+__pycache__/
+*.pyc 
+
+# Local virtual environment (if any)
+
+.venv/
+venv/

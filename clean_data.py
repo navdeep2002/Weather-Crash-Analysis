@@ -41,7 +41,7 @@ MONTH_NUMBERS = {
 
 def clean_text_columns(data, columns):
 
-  # using a for loop we will remove trailing spaces, and rename the column names to uppercase
+  # using a for loop we will remove trailing spaces, and uppercase the column values to uppercase
   # we will not remove any missing values because even missing values can affect the bias of data, as taught in lectures
 
   for column in columns:
@@ -73,4 +73,118 @@ def city_from_weather_filename(filename):
       return "ABBOTSFORD"
 
     raise ValueError(f"Unknown weather filename: {filename}") # this is basically the else clause but for a ValueError for error handling
+
+
+# 2.) import the icbc raw datasets (lower mainland data and police reported crashes), and then clean them
+
+icbc_columns = [ 
+  "Date Of Loss Year",
+  "Month Of Year",
+  "Municipality Name (ifnull)",
+  "Crash Severity",
+  "Day Of Week",
+  "Derived Crash Configuration",
+  "Intersection Crash",
+  "Time Category",
+  "Animal Flag",
+  "Cyclist Flag",
+  "Heavy Veh Flag",
+  "Motorcycle Flag",
+  "Pedestrian Flag",
+  "Total Crashes",
+  "Total Victims",
+]
+
+icbc_data = pd.read_csv(ICBC_FILE, usecols = icbc_columns, low_memory=False) # low memory, if true, processed the file in chucks. I set it to false to remove any possibility of mixed type inferences (Pandas documentation)
+
+# in the process of cleaning, I would also want to rename the columns so they are descriptive enough to know what happens and viewable in the dataframe, conventionally with underscore characters
+# the left side of the (:) is what it is in the raw dataset, and the right is what I would want to rename it. applies to all columns
+
+icbc_data = icbc_data.rename(
+  columns={
+    "Date Of Loss Year": "year",
+    "Month Of Year": "month_name",
+    "Municipality Name (ifnull)": "municipality",
+    "Crash Severity": "crash_severity",
+    "Day Of Week": "day_of_week",
+    "Derived Crash Configuration": "crash_configuration",
+    "Intersection Crash": "intersection_crash",
+    "Time Category": "time_category",
+    "Animal Flag": "animal_involved",
+    "Cyclist Flag": "cyclist_involved",
+    "Heavy Veh Flag": "heavy_vehicle_involved",
+    "Motorcycle Flag": "motorcycle_involved",
+    "Pedestrian Flag": "pedestrian_involved",
+    "Total Crashes": "total_crashes",
+    "Total Victims": "total_victims",
+  }
+)
+
+icbc_text_columns = [
+  "month_name",
+  "municipality",
+  "crash_severity",
+  "day_of_week",
+  "crash_configuration",
+  "intersection_crash",
+  "time_category",
+  "animal_involved",
+  "cyclist_involved",
+  "heavy_vehicle_involved",
+  "motorcycle_involved",
+  "pedestrian_involved",
+]
+
+icbc_data = clean_text_columns(icbc_data, icbc_text_columns) # called the helper function on this to uppercase the values and remove any trailing spaces
+
+# now that rename and uppercasing is done, we now need to convert the year, month, crash count, and victim count to numerical values to be used for analysis and testing
+# when errors is set to coerce, then invalid parsing is set to NaN (pandas to_numeric() docs)
+
+icbc_data["year"] = pd.to_numeric(icbc_data["year"], errors="coerce").astype("Int64") 
+icbc_data["month"] = (icbc_data["month_name"].map(MONTH_NUMBERS).astype("Int64"))
+icbc_data["total_crashes"] = pd.to_numeric(icbc_data["total_crashes"], errors="coerce")
+icbc_data["total_victims"] = pd.to_numeric(icbc_data["total_victims"], errors="coerce")
+
+icbc_data = icbc_data.drop(columns="month_name") # drop the column with name = month_name, since we created the numeric month earlier, month_name is no loner needed
+
+# although our data is in the year range we specified at the top and the municipalities, I decided to add the code to filter for that for error handling
+
+icbc_data = icbc_data[icbc_data["year"].isin(YEARS) & icbc_data["municipality"].isin(MUNICIPALITIES)].copy()
+
+# in the nex step of the data cleaning process, we need to ensure that we drop any rows that does not have corresponding month, year, municipality, or crash count, as
+# that is information that is needed and important
+
+icbc_data = icbc_data.dropna(subset=["year", "month", "municipality", "total_crashes"])
+
+# another error handling procedure would be to handle invalid counts, such as negative numbers. we need to ensure the cleaned data we use is 0 or above
+
+icbc_data = icbc_data[(icbc_data["total_crashes"] >=0 ) & (
+
+  icbc_data["total_victims"].isna() | (icbc_data["total_victims"] >= 0) # isna() detects any missing values and returns a boolean. here we are checking if the count is NA or negative
+
+)].copy()
+
+
+# for specific vehicle collision categories, I would need to create the counts for those. this will primarily be done using .where() and comparisons 
+
+icbc_data["casualty_crashes"] = icbc_data["total_crashes"].where(
+    icbc_data["crash_severity"] == "CASUALTY CRASH",
+    0,
+) # out of all crashes, crashes flagged with casualty will count as a "casualty_crashes" (such is the same logic for the bottom 3)
+
+icbc_data["pedestrian_crashes"] = icbc_data["total_crashes"].where(
+    icbc_data["pedestrian_involved"] == "YES",
+    0,
+)
+
+icbc_data["cyclist_crashes"] = icbc_data["total_crashes"].where(
+    icbc_data["cyclist_involved"] == "YES",
+    0,
+)
+
+icbc_data["motorcycle_crashes"] = icbc_data["total_crashes"].where(
+    icbc_data["motorcycle_involved"] == "YES",
+    0,
+)
+
 
