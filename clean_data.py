@@ -34,7 +34,7 @@ MONTH_NUMBERS = {
   "SEPTEMBER": 9,
   "OCTOBER": 10,
   "NOVEMBER": 11,
-  "DECEMBER": 12,
+  "DECEMBER": 12
 }
 
 # we created 2 helper functions for changing column names to uppercase and also determining which city a weather file represents
@@ -92,7 +92,7 @@ icbc_columns = [
   "Motorcycle Flag",
   "Pedestrian Flag",
   "Total Crashes",
-  "Total Victims",
+  "Total Victims"
 ]
 
 icbc_data = pd.read_csv(ICBC_FILE, usecols = icbc_columns, low_memory=False) # low memory, if true, processed the file in chucks. I set it to false to remove any possibility of mixed type inferences (Pandas documentation)
@@ -116,7 +116,7 @@ icbc_data = icbc_data.rename(
     "Motorcycle Flag": "motorcycle_involved",
     "Pedestrian Flag": "pedestrian_involved",
     "Total Crashes": "total_crashes",
-    "Total Victims": "total_victims",
+    "Total Victims": "total_victims"
   }
 )
 
@@ -132,7 +132,7 @@ icbc_text_columns = [
   "cyclist_involved",
   "heavy_vehicle_involved",
   "motorcycle_involved",
-  "pedestrian_involved",
+  "pedestrian_involved"
 ]
 
 icbc_data = clean_text_columns(icbc_data, icbc_text_columns) # called the helper function on this to uppercase the values and remove any trailing spaces
@@ -169,22 +169,22 @@ icbc_data = icbc_data[(icbc_data["total_crashes"] >=0 ) & (
 
 icbc_data["casualty_crashes"] = icbc_data["total_crashes"].where(
     icbc_data["crash_severity"] == "CASUALTY CRASH",
-    0,
+    0
 ) # out of all crashes, crashes flagged with casualty will count as a "casualty_crashes" (such is the same logic for the bottom 3)
 
 icbc_data["pedestrian_crashes"] = icbc_data["total_crashes"].where(
     icbc_data["pedestrian_involved"] == "YES",
-    0,
+    0
 )
 
 icbc_data["cyclist_crashes"] = icbc_data["total_crashes"].where(
     icbc_data["cyclist_involved"] == "YES",
-    0,
+    0
 )
 
 icbc_data["motorcycle_crashes"] = icbc_data["total_crashes"].where(
     icbc_data["motorcycle_involved"] == "YES",
-    0,
+    0
 )
 
 
@@ -214,6 +214,102 @@ icbc_monthly = (
     ]
   )
 )
+
+
+# 4.) repeat the above code process with Police-Reported ICBC Data
+
+police_columns = [
+    "Municipality",
+    "Year",
+    "Accident Type",
+    "Collision Type",
+    "Crash Configuration",
+    "Cyclist Involved",
+    "Hit And Run Indicator",
+    "Impact With Animal",
+    "Month",
+    "Motorcycle Involved",
+    "Pedestrian Involved",
+    "Region",
+    "Road Condition",
+    "Weather",
+    "Crash Count",
+    "Total Casualty",
+    "Total Vehicles Involved"
+]
+
+# read the police reported csv and store it in a pandas dataframe named police_data
+
+police_data = pd.read_csv(
+  POLICE_FILE,
+  usecols=police_columns, 
+  low_memory=False
+)
+
+police_data = police_data.rename(
+  columns = { 
+    "Municipality": "municipality",
+    "Year": "year",
+    "Accident Type": "accident_type",
+    "Collision Type": "collision_type",
+    "Crash Configuration": "crash_configuration",
+    "Cyclist Involved": "cyclist_involved",
+    "Hit And Run Indicator": "hit_and_run",
+    "Impact With Animal": "animal_involved",
+    "Month": "month_name",
+    "Motorcycle Involved": "motorcycle_involved",
+    "Pedestrian Involved": "pedestrian_involved",
+    "Region": "region",
+    "Road Condition": "road_condition",
+    "Weather": "reported_weather",
+    "Crash Count": "crash_count",
+    "Total Casualty": "total_casualties",
+    "Total Vehicles Involved": "total_vehicles"
+  }
+)
+
+police_text_columns = [
+  "municipality",
+  "accident_type",
+  "collision_type",
+  "crash_configuration",
+  "cyclist_involved",
+  "hit_and_run",
+  "animal_involved",
+  "month_name",
+  "motorcycle_involved",
+  "pedestrian_involved",
+  "region",
+  "road_condition",
+  "reported_weather"
+]
+
+police_data = clean_text_columns(police_data, police_text_columns)
+
+police_data["year"] = pd.to_numeric(police_data["year"], errors="coerce").astype("Int64")
+police_data["month"] = (police_data["month"].map(MONTH_NUMBERS).astype("Int64"))
+police_data["crash_count"] = pd.to_numeric(police_data["crash_count"], errors="coerce")
+police_data["total_casualties"] = pd.to_numeric(police_data["total_casualties"], errors="coerce")
+police_data["total_vehicles"] = pd.to_numeric(police_data["total_vehicles"], errors="coerce")
+
+police_data = police_data.drop(columns="month_name")
+
+police_data = police_data[police_data["year"].isin(YEARS) & police_data["municipality"].isin(MUNICIPALITIES)].copy()
+
+police_data = police_data.dropna(
+  subset=[
+    "municipality",
+    "year",
+    "month",
+    "crash_count",
+  ]
+)
+
+# I chose to leave the police reported crash dataset categories which will be useful, ungrouped, because it would get lost or jumbled up
+# during the municipality, year, month, aggregation. later on when we do the analysis and apply the tests and visualization, at that point
+# if the question im answering needs it to be aggregated, I can do it at that point
+
+
 
 
 
