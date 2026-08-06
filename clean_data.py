@@ -188,3 +188,36 @@ icbc_data["motorcycle_crashes"] = icbc_data["total_crashes"].where(
 )
 
 
+# 3.) now we take the main icbc data and aggregate it by month , for this we would use groupby() with agg(), and then sort the values 
+
+icbc_monthly = (
+  icbc_data.groupby(
+    [
+      'municipality', 
+      'year', 
+      'month'
+    ], as_index=False
+  ) 
+  .agg(
+    total_crashes=("total_crashes", "sum"),
+    total_victims=("total_victims", "sum"),
+    casualty_crashes=("casualty_crashes", "sum"),
+    pedestrian_crashes=("pedestrian_crashes", "sum"),
+    cyclist_crashes=("cyclist_crashes", "sum"),
+    motorcycle_crashes=("motorcycle_crashes", "sum")
+  )
+  .sort_values(
+    [
+      'municipality', 
+      'year', 
+      'month'
+    ]
+  )
+)
+
+
+
+
+
+
+
