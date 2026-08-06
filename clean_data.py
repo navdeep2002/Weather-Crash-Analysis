@@ -364,6 +364,53 @@ weather_data = weather_data.rename(
 )
 
 
+# 6.) Clean the weather data which we already combined and imported
+
+weather_data["station_name"] = (weather_data["station_name"].astype("string").str.strip().str.upper())
+weather_data["precipitation_flag"] = (weather_data["precipitation_flag"]
+    .astype("string")
+    .str.strip()
+    .str.upper()
+)
+
+weather_data["date"] = pd.to_datetime(weather_data["date"], errors="coerce") # convert the date time in the file, if the parsing is invalid, then the value is set to NaT
+
+weather_numeric_columns = [
+  "year",
+  "month",
+  "day",
+  "max_temp_c",
+  "min_temp_c",
+  "mean_temp_c",
+  "total_precip_mm"
+]
+
+# using the weather_numeric_columns list we have above, use a for loop to convert all the values to numerics for those columns. replace with NaN or Nat if invalid
+for column in weather_numeric_columns:
+  weather_data[column] = pd.to_numeric(weather_data[column], errors="coerce")
+
+weather_data = weather_data[weather_data["year"].isin(YEARS) & weather_data["municipality"].isin(MUNICIPALITIES)].copy() #copy() makes a new separate changeable obj in a new mem location
+
+# remove the rows with invalid date or missing join fields from the datasets
+weather_data = weather_data.dropna(
+  subset = [ 
+    "date",
+    "year",
+    "month",
+    "municipality"
+  ]
+)
+
+# we will need to ensure that any negative precipitation values are handled as invalid, because negative precip numbers just dont exist
+weather_data.loc[weather_data["total_precip_mm"] < 0, "total_precip_mm"] = pd.NA
+
+# Keep the missing measurements as missing rather than imputing them, anything that is above 0 is going to be converted to int64
+weather_data["measurable_precip_day"] = (weather_data["total_precip_mm"] > 0).astype("Int64")
+weather_data.loc[weather_data["total_precip_mm"].isna(), "measurable_precip_day"] = pd.NA
+
+weather_data["freezing_day"] = (weather_data["min_temp_c"] < 0).astype("Int64") # freezing day would be considered with a number less than 0 degrees celsius
+weather_data.loc[weather_data["min_temp_c"].isna(), "freezing_day"] = pd.NA
+
 
 
 
