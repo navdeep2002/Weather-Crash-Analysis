@@ -412,7 +412,28 @@ weather_data["freezing_day"] = (weather_data["min_temp_c"] < 0).astype("Int64") 
 weather_data.loc[weather_data["min_temp_c"].isna(), "freezing_day"] = pd.NA
 
 
+# 6.) aggregate the weather data by months. the weather data has the mean max and min temps, total precips, and then freezing temp data
 
+# group the data and then aggregate them and apply mean functions on them, sum the precipitation across all days for each month, and then count the number of days
+# where the temperature and precipitation was valid. then sort the  values by the stated column labels
+
+weather_monthly = (
+    weather_data.groupby(["municipality", "year", "month"], as_index=False)
+    .agg(
+        mean_temp_c=("mean_temp_c", "mean"),
+        mean_max_temp_c=("max_temp_c", "mean"),
+        mean_min_temp_c=("min_temp_c", "mean"),
+        total_precip_mm=("total_precip_mm", lambda values: values.sum(min_count=1)), # the reason i needed to use lambda here was because for each city-year-month group, it sums the values in the total_precip_mm 
+        # the lambda is the equvalent of defining a function , in our case it would take the variable values, and then return the sum of all values in values
+        # min_count=1 is needed because it will only sum values that are minimum 1 milimetre and anything less than that is considered NaN which wouldn't be counted. replacing it with zero but incur a bias in the data which I dont need or want to deal with
+      
+        measurable_precip_days=("measurable_precip_day", "sum"),
+        freezing_days=("freezing_day", "sum"),
+        valid_temperature_days=("mean_temp_c", "count"),
+        valid_precipitation_days=("total_precip_mm", "count")
+    )
+    .sort_values(["municipality", "year", "month"])
+)
 
 
 
