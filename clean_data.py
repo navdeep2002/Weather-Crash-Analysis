@@ -308,6 +308,62 @@ police_data = police_data.dropna(
 # I chose to leave the police reported crash dataset categories which will be useful, ungrouped, because it would get lost or jumbled up
 # during the municipality, year, month, aggregation. later on when we do the analysis and apply the tests and visualization, at that point
 # if the question im answering needs it to be aggregated, I can do it at that point
+#___________________________________________________________________________________________________________________________________________________
+
+# 5.) Now we will import and combine the weather data which is spanned across 4 cities and years spanning 2021-2024. cleaning next
+
+
+weather_files = sorted(WEATHER_FOLDER.glob("*Daily Climate Data ???? - Raw.csv")) # glob module finds files and directories that match the given style. kind of like regex. ???? is for the different years. I search on google, "how to import files with similar names into python code without passing them in as sys arguments"
+# 'file_path.glob("*")' this is for finding all matching files, the sorts a list to weather_files variable 
+
+if len(weather_files) != 16:
+  raise ValueError(
+    f"expected 16 weather CSV files, found {len(weather_files)}"
+  ) # error handling, since we only have 16 weather dataset files 
+
+weather_columns = [
+  "Station Name",
+  "Climate ID",
+  "Date/Time",
+  "Year",
+  "Month",
+  "Day",
+  "Max Temp (°C)",
+  "Min Temp (°C)",
+  "Mean Temp (°C)",
+  "Total Precip (mm)",
+  "Total Precip Flag"
+]
+
+weather_frames = [] # declare / initialize an empty list
+
+# use a for loop to go through the 16 CSV files to append and concatenate them: 
+for weather_file in weather_files:
+  city_weather = pd.read_csv(weather_file, usecols=weather_columns)
+
+  city_weather["municipality"] = city_from_weather_filename(weather_file.name) # get the file name and then create a new dataframe column for that municipality
+
+  weather_frames.append(city_weather) # append all the files into a single collection item
+
+weather_data = pd.concat(weather_frames, ignore_index=True) 
+
+weather_data = weather_data.rename(
+  columns = {
+    "Station Name": "station_name",
+    "Climate ID": "climate_id",
+    "Date/Time": "date",
+    "Year": "year",
+    "Month": "month",
+    "Day": "day",
+    "Max Temp (°C)": "max_temp_c",
+    "Min Temp (°C)": "min_temp_c",
+    "Mean Temp (°C)": "mean_temp_c",
+    "Total Precip (mm)": "total_precip_mm",
+    "Total Precip Flag": "precipitation_flag"
+  }
+)
+
+
 
 
 
