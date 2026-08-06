@@ -436,7 +436,19 @@ weather_monthly = (
 )
 
 
+# 7.) join the monthly icbc datasets and the weather datasets before exporting them in the last step
 
+combined_monthly = icbc_monthly.merge(weather_monthly, on=["municipality", "year", "month"], how="inner") #join the two datasets
+combined_monthly = combined_monthly.sort_values(["municipality", "year", "month"])
+
+expected_months = (len(MUNICIPALITIES) * len(YEARS) * 12) #this should produce 192 months
+
+# test print statement
+
+print(f"Expected monthly rows: {expected_months}")
+print(f"ICBC monthly rows: {len(icbc_monthly)}")
+print(f"Weather monthly rows: {len(weather_monthly)}")
+print(f"Combined monthly rows: {len(combined_monthly)}")
 
 
 
