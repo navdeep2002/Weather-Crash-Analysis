@@ -1,5 +1,6 @@
 import pandas as pd 
 from pathlib import Path
+import sys 
 assert sys.version_info >= (3, 8) # just to make sure the TA or professor, or any other professional has the minimum python requirements
 
 # 1.) we will first globally declare our file locations and the constants we will be using for cleaning our data 
@@ -47,7 +48,7 @@ def clean_text_columns(data, columns):
   for column in columns:
     data[column] = (data[column].astype("string").str.strip().str.upper())
 
-    return data
+  return data
 
 
 def city_from_weather_filename(filename):
@@ -60,19 +61,19 @@ def city_from_weather_filename(filename):
 
     return "VANCOUVER"
 
-    if filename.startswith("Richmond "):
+  if filename.startswith("Richmond "):
 
-      return "RICHMOND"
+    return "RICHMOND"
 
-    if filename.startswith("Delta "):
+  if filename.startswith("Delta "):
 
-      return "DELTA"
+    return "DELTA"
 
-    if filename.startswith("Abbotsford "):
+  if filename.startswith("Abbotsford "):
 
-      return "ABBOTSFORD"
+    return "ABBOTSFORD"
 
-    raise ValueError(f"Unknown weather filename: {filename}") # this is basically the else clause but for a ValueError for error handling
+  raise ValueError(f"Unknown weather filename: {filename}") # this is basically the else clause but for a ValueError for error handling
 
 
 # 2.) import the icbc raw datasets (lower mainland data and police reported crashes), and then clean them
@@ -284,10 +285,11 @@ police_text_columns = [
   "reported_weather"
 ]
 
+
 police_data = clean_text_columns(police_data, police_text_columns)
 
 police_data["year"] = pd.to_numeric(police_data["year"], errors="coerce").astype("Int64")
-police_data["month"] = (police_data["month"].map(MONTH_NUMBERS).astype("Int64"))
+police_data["month"] = (police_data["month_name"].map(MONTH_NUMBERS).astype("Int64"))
 police_data["crash_count"] = pd.to_numeric(police_data["crash_count"], errors="coerce")
 police_data["total_casualties"] = pd.to_numeric(police_data["total_casualties"], errors="coerce")
 police_data["total_vehicles"] = pd.to_numeric(police_data["total_vehicles"], errors="coerce")
@@ -313,7 +315,7 @@ police_data = police_data.dropna(
 # 5.) Now we will import and combine the weather data which is spanned across 4 cities and years spanning 2021-2024. cleaning next
 
 
-weather_files = sorted(WEATHER_FOLDER.glob("*Daily Climate Data ???? - Raw.csv")) # glob module finds files and directories that match the given style. kind of like regex. ???? is for the different years. I search on google, "how to import files with similar names into python code without passing them in as sys arguments"
+weather_files = sorted(WEATHER_FOLDER.glob("*.csv")) # glob module finds files and directories that match the given style. kind of like regex. ???? is for the different years. I search on google, "how to import files with similar names into python code without passing them in as sys arguments"
 # 'file_path.glob("*")' this is for finding all matching files, the sorts a list to weather_files variable 
 
 if len(weather_files) != 16:
@@ -443,6 +445,13 @@ combined_monthly = combined_monthly.sort_values(["municipality", "year", "month"
 
 expected_months = (len(MUNICIPALITIES) * len(YEARS) * 12) #this should produce 192 months
 
+# Confirm that every expected municipality-month was joined
+if len(combined_monthly) != expected_months:
+  raise ValueError(
+    f"Expected {expected_months} combined monthly rows, "
+    f"but found {len(combined_monthly)}."
+  )
+
 # test print statement
 
 print(f"Expected monthly rows: {expected_months}")
@@ -451,5 +460,28 @@ print(f"Weather monthly rows: {len(weather_monthly)}")
 print(f"Combined monthly rows: {len(combined_monthly)}")
 
 
+# 8.) this is the last step in the cleaning data pipeline where we would now export the cleaned data to new folders (much of this code is adapted from lectures and exercises)
+
+CLEANED_FOLDER.mkdir(exist_ok=True) # make a directory file in our project folder called "cleaned_data"
+
+icbc_data.to_csv(CLEANED_FOLDER / "icbc_clean.csv", index=False)
+
+icbc_monthly.to_csv(CLEANED_FOLDER / "icbc_monthly.csv", index=False)
+
+police_data.to_csv(CLEANED_FOLDER / "police_crashes_clean.csv", index=False)
+
+weather_data.to_csv(CLEANED_FOLDER / "weather_daily_clean.csv", index=False)
+
+weather_monthly.to_csv(CLEANED_FOLDER / "weather_monthly.csv", index=False)
+
+combined_monthly.to_csv(CLEANED_FOLDER / "combined_monthly.csv", index=False)
+
+# test print statements 
+
+print("\nCleaning complete.")
+print(f"Clean ICBC rows: {len(icbc_data):,}")
+print(f"Clean police-reported rows: {len(police_data):,}")
+print(f"Clean weather rows: {len(weather_data):,}")
+print(f"Files saved in: {CLEANED_FOLDER}")
 
 

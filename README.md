@@ -6,7 +6,7 @@ Weather Conditions and Reported Vehicle Crash Patterns in Selected Lower Mainlan
 
 ## Project Overview
 
-This project will examine reported vehicle crash patterns in Vancouver, Richmond, Delta, and Abbotsford from 2021 to 2024
+This project will examine reported vehicle crash patterns in Vancouver, Richmond (YVR), Delta, and Abbotsford from 2021 to 2024
 ICBC crash data will be combined with daily historical weather observations from Environment and Climate Change Canada
 
 The weather records will be aggregated to monthly measurements so they can be joined with the ICBC data by municipality, year, and month
@@ -54,7 +54,7 @@ Contains additional information such as:
 Daily weather observations from 2021 through 2024:
 
 - Vancouver Harbour CS for Vancouver;
-- Richmond Nature Park for Richmond;
+- Richmond YVR (Vancouver International Airport) for Richmond;
 - Burns Bog for Delta;
 - Abbotsford A for Abbotsford
 
@@ -97,19 +97,43 @@ Statistical significance may be evaluated using an alpha level of 0.05, but conc
 ## Repository Structure
 
 ```text
-raw_data/
-├── icbc/
-│   ├── ICBC (new) Lower Mainland Data - RAW.csv
-│   └── ICBC reported crashes 2021-2024.csv
-└── weather/
-    ├── Abbotsford Daily Climate Data 2021 - RAW.csv
-    ├── ...
-    ├── Delta Daily Climate Data 2021 - RAW.csv
-    ├── ...
-    ├── Richmond Daily Climate Data 2021 - RAW.csv
-    ├── ...
-    └── Van Daily Climate Data 2021 - RAW.csv
-
-clean_data.py
-README.md
+cmpt353-project/
+├── raw_data/
+│   ├── icbc/
+│   │   ├── ICBC (new) Lower Mainland Data - RAW.csv
+│   │   ├── ICBC reported crashes 2021-2024.csv
+│   │   └── Lower Mainland_Full Data_RAW_deprecated.csv
+│   │
+│   └── weather/
+│       ├── deprecated_raw_datasets/
+│       │   ├── Richmond Daily Climate Data 2021 - RAW.csv
+│       │   ├── Richmond Daily Climate Data 2022 - RAW.csv
+│       │   ├── Richmond Daily Climate Data 2023 - RAW.csv
+│       │   └── Richmond Daily Climate Data 2024 - RAW.csv
+│       │
+│       ├── Abbotsford Daily Climate Data 2021 - RAW.csv
+│       ├── ...
+│       ├── Delta Daily Climate Data 2021 - RAW.csv
+│       ├── ...
+│       ├── Richmond VIA Daily Climate Data 2021 - RAW.csv
+│       ├── ...
+│       ├── Van Daily Climate Data 2021 - RAW.csv
+│       └── ...
+│
+├── cleaned_data/
+│   ├── icbc_clean.csv
+│   ├── icbc_monthly.csv
+│   ├── police_crashes_clean.csv
+│   ├── weather_daily_clean.csv
+│   ├── weather_monthly.csv
+│   └── combined_monthly.csv
+│
+├── notes/
+│   ├── clean_data.md
+│   └── audit_cleaned_data.md
+│
+├── clean_data.py
+├── audit_cleaned_data.py
+├── .gitignore
+└── README.md
 ```
