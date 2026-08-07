@@ -113,3 +113,71 @@ combined["victims_per_100_crashes"] = (combined["total_victims"] / combined["tot
 # Only use months with at least 80% precipitation coverage
 # for precipitation-dependent statistical analysis.
 precip_data = combined[combined["precipitation_coverage"] >= 0.80].copy()
+
+
+# Using what we have, we will now answer Question 1 for our report, see below: 
+#
+# Research Question 1.) How did crashes and casualty outcomes change over time? 
+#---
+
+# gather the information using grouping and aggregation, specifically the crashes and victim columns by city and year
+annual_summary = (
+    combined.groupby(
+        ["municipality", "year"],
+        as_index=False,
+        observed=True
+    ).agg(
+        total_crashes=("total_crashes", "sum"),
+        total_victims=("total_victims", "sum"),
+        casualty_crashes=("casualty_crashes", "sum"),
+        pedestrian_crashes=("pedestrian_crashes", "sum"),
+        cyclist_crashes=("cyclist_crashes", "sum"),
+        motorcycle_crashes=("motorcycle_crashes", "sum")
+    )
+)
+
+annual_summary["victims_per_100_crashes"] = (annual_summary["total_victims"] / annual_summary["total_crashes"] * 100) #take the average of all victims over all crashes to then get the percentage ratio
+annual_summary.to_csv(TABLE_FOLDER / "annual_summary.csv",index=False,) # output this information as CSV file
+
+
+# now we will calculate the percentage change from 2021 to 2024, start by initializing an empty list for storage
+change_rows = []
+
+for municipality in MUNICIPALITIES:
+
+    city = annual_summary[annual_summary["municipality"] == municipality]
+
+    crashes_2021 = city.loc[city["year"] == 2021, "total_crashes"].iloc[0]
+    crashes_2024 = city.loc[city["year"] == 2024, "total_crashes"].iloc[0]
+
+    percent_change = ((crashes_2024 - crashes_2021) / crashes_2021 * 100)
+
+    change_rows.append({
+        "municipality": municipality,
+        "crashes_2021": crashes_2021,
+        "crashes_2024": crashes_2024,
+        "percent_change_2021_2024": percent_change
+    })
+
+# set the change_rows data to annual_change so we can output it as an CSV to the table folder
+annual_change = pd.DataFrame(change_rows)
+annual_change.to_csv(TABLE_FOLDER / "annual_crash_change.csv", index=False)
+
+
+# Output the annual crash trend figure for crashes and casualties, using seaborn's lineplot graph
+
+sns.set_theme(style="whitegrid")
+plt.figure(figsize=(10, 6))
+sns.lineplot(
+    data=annual_summary,
+    x="year",
+    y="total_crashes",
+    hue="municipality",
+    marker="o"
+)
+
+plt.title("Reported Crashes by Municipality, 2021-2024")
+plt.xlabel("Year")
+plt.ylabel("Total Reported Crashes")
+plt.xticks([2021, 2022, 2023, 2024])
+save_figure("annual_crashes_by_municipality.png") # invokes the save_figure helper we made 
