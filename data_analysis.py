@@ -77,3 +77,39 @@ def save_figure(filename):
         bbox_inches="tight",
     )
     plt.close()
+
+
+#---
+# Load the cleaned data into this file and create some useful variables. we also need to set the data so that we use months with atleast 80% precipitation coverage for statistical analyses we perform later
+#---
+
+combined = pd.read_csv(CLEANED_FOLDER / "combined_monthly.csv")
+police = pd.read_csv(CLEANED_FOLDER / "police_crashes_clean.csv")
+
+combined["month_name"] = combined["month"].map(MONTH_NAMES)
+combined["season"] = combined["month"].apply(month_to_season)
+combined["season"] = pd.Categorical(
+    combined["season"],
+    categories=SEASON_ORDER,
+    ordered=True
+) # pd.Categorical is used here for taking the existing season column and using the list we made earlier to form an ordered categorical column. Categorical converts ordinary strings into a pandas categorical data type
+
+# Number of calendar days in each month, for example if we have year = 2024 and month = 2 (feb), then it will store '29' in the days_in_month column. pandas.Period() is for time-span, unlike datetime which is for a point in time (adapted from Pandas docs)
+combined["days_in_month"] = combined.apply(
+    lambda row: pd.Period(
+        year=int(row["year"]),
+        month=int(row["month"]),
+        freq="M",
+    ).days_in_month,
+    axis=1
+) # axis=1 means we go row by row, as for the lambda, that is short for writing a function, it essentially takes one row at a time, uses that rows year and month to calculate how many days are in it
+
+combined["temperature_coverage"] = (combined["valid_temperature_days"] / combined["days_in_month"])
+combined["precipitation_coverage"] = (combined["valid_precipitation_days"] / combined["days_in_month"])
+
+# Victims per 100 reported crashes.
+combined["victims_per_100_crashes"] = (combined["total_victims"] / combined["total_crashes"] * 100)
+
+# Only use months with at least 80% precipitation coverage
+# for precipitation-dependent statistical analysis.
+precip_data = combined[combined["precipitation_coverage"] >= 0.80].copy()
