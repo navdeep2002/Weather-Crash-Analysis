@@ -121,6 +121,33 @@ def run_regression(data, target): # data = DF to analyze, target = outcome to pr
     return result, r_squared, rmse, len(regression_data) # return the results
 
 
+def collapse_rare_categories(data, column, minimum_crashes=50): # group the crashes so it helps avoid sparse cells when doing Chi contingency 
+
+    result = data.copy()
+    totals = (result.groupby(column)["crash_count"].sum()) # group the column and sum all the crash counts
+
+    rare_categories = totals[totals < minimum_crashes].index # store the index of outliers
+    result[column] = result[column].replace(rare_categories, "OTHER/RARE") # make the category to store the outliers
+
+    return result
+
+def run_chi_square(data, row_column, column_column): # Chi-square test helper which uses crash_count as the observed frequency
+
+    contingency = pd.pivot_table( # create the fields of the continegency table, and the aggfunc here the sum function
+        data,
+        index=row_column,
+        columns=column_column,
+        values="crash_count",
+        aggfunc="sum",
+        fill_value=0
+    )
+
+    chi2, p_value, degrees_freedom, expected = (chi2_contingency(contingency)) # run the actual chi-squared test
+    expected_df = pd.DataFrame(expected, index=contingency.index, columns=contingency.columns) # store the results in this dataframe
+
+    return (contingency, expected_df, chi2, p_value, degrees_freedom) # return the results of this test
+
+
 #---
 # Load the cleaned data into this file and create some useful variables. we also need to set the data so that we use months with atleast 80% precipitation coverage for statistical analyses we perform later
 #---
@@ -421,3 +448,148 @@ wet_dry_plot.set_axis_labels("Month Classification", "Reported Crashes")
 wet_dry_plot.fig.suptitle("Crash Distributions in Drier and Wetter Months", y=1.03)
 wet_dry_plot.savefig(FIGURE_FOLDER / "wet_vs_dry_violin.png", dpi=300, bbox_inches="tight")
 plt.close()
+
+#---
+# Research Question 5.) In the police reported dataset, are weather and road conditions associated with accident characteristics? 
+#---
+#   to do this question, we would need to perform a weighted aggregation using crash_count and then run a Chi-square test of independence
+#   the plots im planning to use is bar chart and heatmap, and then a png of casualty rate by weather
+
+police_weather = ( # summarize the crash, casualty, and vehicle totals for each weather condition using the sum function
+    police.groupby(
+        "reported_weather",
+        as_index=False
+    ).agg(
+        crash_count=("crash_count", "sum"),
+        total_casualties=("total_casualties", "sum"),
+        total_vehicles=("total_vehicles", "sum")
+    )
+)
+
+police_weather["casualties_per_100_crashes"] = (police_weather["total_casualties"] / police_weather["crash_count"] * 100) # calculate casualties per 100 crashes, and put it in a new column named "casualties_per_100_crashes"
+police_weather["vehicles_per_crash"] = (police_weather["total_vehicles"] / police_weather["crash_count"]) # take the average of no. of vehicles per crash
+police_weather = police_weather.sort_values("crash_count", ascending=False) # using sort_values(), sort the crash_count from high -> low for the reported weather
+police_weather.to_csv(TABLE_FOLDER / "police_weather_summary.csv", index=False) # save the table to the table folder
+
+police_road = ( # do the same operation here that we did above but this time for the reported road conditions
+    police.groupby(
+        "road_condition",
+        as_index=False
+    )
+    .agg(
+        crash_count=("crash_count", "sum"),
+        total_casualties=("total_casualties", "sum"),
+        total_vehicles=("total_vehicles", "sum")
+    )
+)
+
+police_road["casualties_per_100_crashes"] = (police_road["total_casualties"] / police_road["crash_count"] * 100) # calculated casualties per 100 for each road condition
+police_road.to_csv(TABLE_FOLDER / "police_road_summary.csv", index=False) # save the road condition summary table
+
+# police reported weather counts plot using a bar plot
+
+plt.figure(figsize=(11, 6))
+sns.barplot(data=police_weather, x="reported_weather", y="crash_count")
+plt.title("Police-Reported Crashes by Weather Condition")
+plt.xlabel("Reported Weather")
+plt.ylabel("Crash Count")
+plt.xticks(rotation=45, ha="right")
+
+save_figure("police_weather_crashes.png")
+
+# police reported road condition plot also using a bar plot
+
+plt.figure(figsize=(10, 6))
+sns.barplot(data=police_road.sort_values("crash_count", ascending=False), x="road_condition", y="crash_count")
+plt.title("Police-Reported Crashes by Road Condition")
+plt.xlabel("Road Condition")
+plt.ylabel("Crash Count")
+plt.xticks(rotation=45, ha="right")
+save_figure("police_road_conditions.png")
+
+# casualty rate by reported weather plot using bar plot as well for each weather condition
+
+plt.figure(figsize=(11, 6))
+sns.barplot(data=police_weather, x="reported_weather", y="casualties_per_100_crashes")
+plt.title("Casualties per 100 Crashes by Reported Weather")
+plt.xlabel("Reported Weather")
+plt.ylabel("Casualties per 100 Crashes")
+plt.xticks(rotation=45, ha="right")
+save_figure("police_weather_casualty_rate.png")
+
+# Chi-square tests of independence
+# missing or NaN values are kept in the cleaned dataset file but excluded from here because they dont represent weather or road conditions
+
+police_known_weather = police[police["reported_weather"] != "UNKNOWN"].copy() # remove UNKNOWN weather values
+police_known_weather = collapse_rare_categories(police_known_weather, "reported_weather") # combine the weather categories that have very small counts, basically outliers
+
+(
+    weather_contingency,
+    weather_expected,
+    weather_chi2,
+    weather_chi_p,
+    weather_df
+) = run_chi_square(police_known_weather, "reported_weather", "accident_type") # test if the reported weather and accident type have any association with each other
+
+weather_contingency.to_csv(TABLE_FOLDER / "weather_accident_type_contingency.csv") # save both the observed and expected frequency tables to the respective folder
+weather_expected.to_csv(TABLE_FOLDER / "weather_accident_type_expected.csv")
+
+
+# Road condition × accident type -->> remove the UNKNOWN road conditions before performing the test as well as combining road condition categories with small counts (outliers)
+
+police_known_road = police[police["road_condition"] != "UNKNOWN"].copy()
+police_known_road = collapse_rare_categories(police_known_road, "road_condition")
+
+(
+    road_contingency,
+    road_expected,
+    road_chi2,
+    road_chi_p,
+    road_df,
+) = run_chi_square(police_known_road, "road_condition", "accident_type") # test if the road condition and accident type have any association with each other
+
+road_contingency.to_csv(TABLE_FOLDER / "road_accident_type_contingency.csv") # save both the observed and expected road condition frequency tables to the table_folder
+road_expected.to_csv(TABLE_FOLDER / "road_accident_type_expected.csv")
+
+# normalized weather × accident-type heatmap
+# Each row sums to 100% which makes it easier to compare the accident type distribution across the weather conditions
+weather_percent = (weather_contingency.div(weather_contingency.sum(axis=1), axis=0) * 100) # converting each row to %
+
+# plot the percentage distribution of accident types within each weather group
+plt.figure(figsize=(10, 6))
+sns.heatmap(weather_percent, annot=True, fmt=".1f", cmap="Blues")
+plt.title("Accident Type Distribution by Reported Weather (%)")
+plt.xlabel("Accident Type")
+plt.ylabel("Reported Weather")
+save_figure("police_weather_accident_heatmap.png")
+
+# Correlation heatmap and plot below
+
+correlation_columns = [ # select the monthly crash and weather columns for a correlation analysis
+    "total_crashes",
+    "total_victims",
+    "casualty_crashes",
+    "pedestrian_crashes",
+    "cyclist_crashes",
+    "motorcycle_crashes",
+    "mean_temp_c",
+    "total_precip_mm",
+    "measurable_precip_days",
+    "freezing_days"
+]
+
+correlation_matrix = combined[correlation_columns].corr() # here we calculate a pairwise pearson correlation between the variable/columns above^
+correlation_matrix.to_csv(TABLE_FOLDER / "correlation_matrix.csv") # save the numerical correlation matrix to the TABLE_FOLDER
+
+# plot the strength and direction of the correlations using the heatmap plot
+plt.figure(figsize=(11, 8))
+sns.heatmap(correlation_matrix, annot=True, fmt=".2f", cmap="coolwarm", center=0)
+plt.title("Correlation Matrix of Monthly Crash and Weather Measures")
+save_figure("correlation_heatmap.png")
+
+# print a short completion summary after the data_analysis program is complete, and in the last line, it should tell us how many months were excluded from 
+# precipitation based analyses
+print("\nData analysis complete.")
+print(f"Figures saved in: {FIGURE_FOLDER}")
+print(f"Tables saved in: {TABLE_FOLDER}")
+print("Months excluded from precipitation analysis:", len(combined) - len(precip_data))

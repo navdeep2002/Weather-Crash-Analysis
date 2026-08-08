@@ -6,20 +6,23 @@ Weather Conditions and Reported Vehicle Crash Patterns in Selected Lower Mainlan
 
 ## Project Overview
 
-This project will examine reported vehicle crash patterns in Vancouver, Richmond (YVR), Delta, and Abbotsford from 2021 to 2024
-ICBC crash data will be combined with daily historical weather observations from Environment and Climate Change Canada
+This project examines reported vehicle crash patterns in Vancouver, Richmond, Delta, and Abbotsford from 2021 to 2024
 
-The weather records will be aggregated to monthly measurements so they can be joined with the ICBC data by municipality, year, and month
+ICBC crash data is combined with daily historical weather observations from Environment and Climate Change Canada. The weather records are aggregated to monthly measurements so they can be combined with the ICBC data by municipality, year, and month
 
-## Some Research Questions That May Be Answered
+The project also uses a separate ICBC police reported crash dataset to examine reported weather conditions, road conditions, accident types, casualty outcomes, and vehicles involved
+
+## Research Questions
 
 1. How did reported crash counts and casualty outcomes vary by municipality, year, month, and season from 2021 to 2024?
 
 2. Are monthly precipitation and temperature associated with reported crash frequency?
 
-3. Do crash counts or casualty outcomes differ between wetter and drier months?
+3. Do reported crash counts differ between wetter and drier months?
 
 4. Does the relationship between weather and crashes differ among Vancouver, Richmond, Delta, and Abbotsford?
+
+5. In the police-reported crash dataset, how are reported weather and road conditions associated with accident type and casualty outcomes?
 
 ## Data Sources
 
@@ -27,72 +30,182 @@ The weather records will be aggregated to monthly measurements so they can be jo
 
 Contains crash information such as:
 
-- municipality;
-- year and month;
-- crash severity;
-- crash configuration;
-- day of week and time category;
-- pedestrian, cyclist, motorcycle, and heavy-vehicle involvement;
-- total crashes;
+- municipality
+- year and month
+- crash severity
+- crash configuration
+- day of week and time category
+- pedestrian, cyclist, motorcycle, and heavy-vehicle involvement
+- total crashes
 - total victims
 
 ### ICBC Police-Reported Crashes
 
 Contains additional information such as:
 
-- accident type;
-- collision type;
-- crash configuration;
-- weather;
-- road condition;
-- total casualties;
-- total vehicles involved;
+- accident type
+- collision type
+- crash configuration
+- weather
+- road condition
+- total casualties
+- total vehicles involved
 - vulnerable-road-user indicators
 
 ### Environment and Climate Change Canada
 
-Daily weather observations from 2021 through 2024:
+Daily weather observations from 2021 through 2024 are used from the following stations:
 
-- Vancouver Harbour CS for Vancouver;
-- Richmond YVR (Vancouver International Airport) for Richmond;
-- Burns Bog for Delta;
+- Vancouver Harbour CS for Vancouver
+- Vancouver International Airport (YVR) for Richmond
+- Burns Bog for Delta
 - Abbotsford A for Abbotsford
 
 Important weather fields include:
 
 - mean, minimum, and maximum temperature;
-- total rain;
-- total snow;
 - total precipitation;
-- weather-data quality and missing-value flags
+- precipitation flags and missing-value indicators
 
-## Planned Data Processing
+Richmond Nature Park was initially selected as the Richmond weather station. During data validation, its observations were found to become substantially incomplete in late 2023 and unavailable through 2024
+Vancouver International Airport, which is located in Richmond, was therefore used consistently for Richmond for the full 2021-2024 period
 
-The `clean_data.py` script will:
+## Data Processing
 
-1. Load the untouched raw CSV files
-2. Standardize column names and data types
-3. Keep records from 2021 through 2024
-4. Remove fields not required for the analysis
-5. Convert missing-value and trace-precipitation codes
-6. Examine duplicate records, missing values, and unusual observations
-7. Aggregate daily weather observations by municipality, year, and month
-8. Aggregate ICBC crash data to the same municipality-month level
-9. Join the crash and weather datasets using municipality, year, and month
-10. Write cleaned datasets for later analysis
+The `clean_data.py` script:
 
-## Planned Analysis
+1. Loads the untouched raw CSV files
+2. Standardizes column names, text values, and data types
+3. Keeps records from 2021 through 2024 for Vancouver, Richmond, Delta, and Abbotsford
+4. Keeps the fields required for the project analysis
+5. Preserves valid zero precipitation values and missing weather observations
+6. Rejects invalid negative precipitation and crash-count values
+7. Creates crash-category fields such as casualty, pedestrian, cyclist, and motorcycle crashes
+8. Aggregates daily weather observations by municipality, year, and month
+9. Aggregates the main ICBC crash data to the same municipality-year-month level
+10. Joins the monthly crash and weather datasets using municipality, year, and month
+11. Writes the cleaned datasets to `cleaned_data/`
 
-The project may use:
+The final monthly ICBC, monthly weather, and combined datasets each contain 192 rows:
 
-- descriptive statistics and grouped summaries;
-- monthly and seasonal visualizations;
-- Pearson or Spearman correlation;
-- wet-versus-dry period comparisons;
-- ANOVA or non-parametric group comparisons;
-- linear regression, where appropriate
+- 4 municipalities
+- 4 years
+- 12 months
 
-Statistical significance may be evaluated using an alpha level of 0.05, but conclusions will also consider effect size, patterns, and practical importance
+This gives one row for every municipality-year-month combination
+
+## Cleaned-Data Validation
+
+The `audit_cleaned_data.py` script checks the generated cleaned data for:
+
+- expected municipality, year, and month coverage
+- duplicate monthly keys
+- missing weather observations
+- valid temperature and precipitation observation counts
+- impossible or suspicious values
+- consistency of the ICBC monthly aggregation
+- unknown categories in the police-reported data
+
+Weather observations are not imputed
+
+For precipitation-dependent statistical analysis, months with less than 80% valid daily precipitation coverage are excluded. This removes one monthly observation, Vancouver in April 2021, from precipitation-based analysis
+
+## Analysis
+
+The `data_analysis.py` script performs the project analysis using the cleaned datasets
+
+Techniques used include:
+
+- descriptive statistics and grouped summaries
+- annual, monthly, and seasonal crash-pattern analysis
+- Pearson correlation (explained in report and code comments)
+- Spearman correlation( ^^)
+- multiple linear regression
+- Mann-Whitney U tests comparing wetter and drier months
+- Chi-square tests of independence for police-reported weather, road conditions, and accident type
+- Seaborn and Matplotlib visualizations
+
+Statistical significance is evaluated using an alpha level of 0.05. Results are interpreted as associations rather than causal relationships
+
+Generated figures and tables are written to `data_analysis_output/`
+
+## Requirements
+
+The project was developed using Python 3.10
+
+Required Python libraries:
+
+- pandas
+- numpy
+- scipy
+- scikit-learn
+- matplotlib
+- seaborn
+
+The required libraries can be installed with:
+
+```bash
+pip install pandas numpy scipy scikit-learn matplotlib seaborn
+```
+
+## Running the Project
+
+Run all commands from the repository root
+
+### 1. Clean the data
+
+```bash
+python3 clean_data.py
+```
+
+No command-line arguments are required
+
+The cleaned datasets are written to:
+
+```text
+cleaned_data/
+```
+
+The primary monthly dataset used for the weather/crash analysis is:
+
+```text
+cleaned_data/combined_monthly.csv
+```
+
+A successful cleaning run produces:
+
+```text
+Expected monthly rows: 192
+ICBC monthly rows: 192
+Weather monthly rows: 192
+Combined monthly rows: 192
+```
+
+### 2. Audit the cleaned data
+
+```bash
+python3 audit_cleaned_data.py
+```
+
+No command-line arguments are required
+
+This performs structural and data-quality checks on the cleaned outputs
+
+### 3. Run the analysis
+
+```bash
+python3 data_analysis.py
+```
+
+No command-line arguments are required
+
+Generated results are saved under:
+
+```text
+data_analysis_output/
+├── figures/
+└── tables/
+```
 
 ## Repository Structure
 
@@ -128,12 +241,31 @@ cmpt353-project/
 │   ├── weather_monthly.csv
 │   └── combined_monthly.csv
 │
+├── data_analysis_output/
+│   ├── figures/
+│   └── tables/
+│
 ├── notes/
 │   ├── clean_data.md
 │   └── audit_cleaned_data.md
 │
 ├── clean_data.py
 ├── audit_cleaned_data.py
+├── data_analysis.py
 ├── .gitignore
 └── README.md
 ```
+
+## Interpretation Notes and Limitations
+
+The project analyzes statistical associations and does not establish baseless conclusions
+
+Important limitations include:
+
+- traffic volume and vehicle exposure were not available
+- population differences among municipalities were not directly controlled
+- road design, construction, enforcement, commuting patterns, and other factors may affect crash frequency
+- raw police-reported crash counts by weather or road condition should not be interpreted as crash risk because the amount of time motorists were exposed to each condition is unknown
+- some weather observations are missing, although monthly coverage was checked and low-coverage precipitation months were excluded where appropriate
+
+The cleaned and analysis outputs are retained so that the processing and statistical results can be inspected and reproduced
