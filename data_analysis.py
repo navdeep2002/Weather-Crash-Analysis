@@ -78,6 +78,48 @@ def save_figure(filename):
     )
     plt.close()
 
+# regression for research question 3 and 4, predictors: monthly precip, monthly mean temp, municipality, year
+def run_regression(data, target): # data = DF to analyze, target = outcome to predict
+    regression_data = data[
+        [
+            target, 
+            "total_precip_mm",
+            "mean_temp_c", 
+            "municipality",
+            "year"
+        ]
+    ].dropna() # creates a smaller DF that contains only the variables we need for the regress. dropna() removes rows which contain missing values in any of the stated columns
+
+    # convert the municipality and year categories into dummy variables because reression requires numerical inputs, but municipality and year are categorical 
+    X = pd.get_dummies( # get_dummies converts those categories into numeric dummy variables which are assigned some number
+        regression_data[
+            [
+                "total_precip_mm",
+                "mean_temp_c",
+                "municipality",
+                "year"
+            ]
+        ],
+        columns=["municipality", "year"],
+        drop_first=True, # avoids making any redundant dummy vars
+        dtype=float # dummy var numbers are turned into floating points
+    )
+
+    y = regression_data[target] # either total_crashes or total_victims
+
+    model = LinearRegression() # creates the empty LR model
+    model.fit(X, y) # LR starts, the model will look at the observations and will then estimate the coef's
+
+    predictions = model.predict(X) # predict outcome for every row
+
+    result = pd.DataFrame({"predictor": X.columns, "coefficient": model.coef_}) # creates a DF table that contains each prediction variable and regress coef
+    result.loc[len(result)] = ["INTERCEPT", model.intercept_] # adds the models intercept into the results table, here the intercept is predicted outcome when all prediction vars are 0
+
+    r_squared = r2_score(y, predictions) # calculates r_squared // tells us how much of the variation in the outcome is explained by the model
+    rmse = np.sqrt(mean_squared_error(y, predictions)) # take the square root of the actual values vs the predicted values which gives us the "Root Mean Squared Error" saved into rmse
+
+    return result, r_squared, rmse, len(regression_data) # return the results
+
 
 #---
 # Load the cleaned data into this file and create some useful variables. we also need to set the data so that we use months with atleast 80% precipitation coverage for statistical analyses we perform later
@@ -197,7 +239,6 @@ monthly_pattern = (
     ["total_crashes"].mean()
 )
 
-# 
 monthly_pattern["month_name"] = (monthly_pattern["month"].map(MONTH_NAMES)) # the map function here is for pandas.series.map since it goes row by row because we selected on column (month_name)
 monthly_pattern.to_csv(TABLE_FOLDER / "monthly_crash_pattern.csv", index=False) # output the results to a table csv in the mentioned folder
 
@@ -228,3 +269,155 @@ plt.title("Average Monthly Crashes by Season")
 plt.xlabel("Season")
 plt.ylabel("Average Monthly Crashes")
 save_figure("seasonal_crash_pattern.png")
+
+#---
+# rq3 and rq4 are both related to one another and contain statistical tests. the plots used here are: lmplot and catplot (using violinplot as the categorical distribution "kind='violin'")
+# for the statistical tests, we use mann-whitney-u on all the cities in a for loop, pvalue tests (Pearson (better suitable for categorical data that is numerical) and Spearman)
+#   * according to some research, Pearson tests is for finding if there is a linear relationship between two numerical datasets (in our case, crash_counts vs precipitation)
+#     and spearman tests is for finding a monotonic relationship (aka. 2 variables are connected and move in the same direction), between them (in our case, as precipitation increases, do crash counts increase or decrease, even if the pattern is not 100% linear)
+#   * ** the idea to use pearson and spearman was something that was suggested by Generative AI **
+# Linear regression will also be used here multiple times, for model crash_counts using (precip, temp, city, and year). A helper is created to run the regression, instead of duplicating code multiple times
+
+# Research Questions (3)(4).) Are precipitation and temperature associated with crash frequency, and does this differ by each municipality? 
+#                             Do wetter months have different crash counts versus drier months? 
+#---
+
+correlation_rows = [] # initialize empty list
+
+for municipality in MUNICIPALITIES:
+
+    city_all = combined[combined["municipality"] == municipality]
+    city_precip = precip_data[precip_data["municipality"] == municipality]
+
+    # Here we use pearson testing to find a linear relationship between total precipitation and total crashes (explained above the RQ's above)
+    precip_r, precip_p = pearsonr(city_precip["total_precip_mm"], city_precip["total_crashes"])
+    temp_r, temp_p = pearsonr(city_all["mean_temp_c"], city_all["total_crashes"])
+
+    # Here we use Spearman testing to find a monotonic relationship between the data to see if the both increase, decrease, or go separate ways 
+    precip_spearman, precip_spearman_p = spearmanr(city_precip["total_precip_mm"], city_precip["total_crashes"])
+    temp_spearman, temp_spearman_p = spearmanr(city_all["mean_temp_c"], city_all["total_crashes"])
+
+    correlation_rows.append({
+        "municipality": municipality,
+        "precipitation_pearson_r": precip_r,
+        "precipitation_pearson_p": precip_p,
+        "precipitation_spearman_r": precip_spearman,
+        "precipitation_spearman_p": precip_spearman_p,
+        "temperature_pearson_r": temp_r,
+        "temperature_pearson_p": temp_p,
+        "temperature_spearman_r": temp_spearman,
+        "temperature_spearman_p": temp_spearman_p
+    })
+
+# create a dataframe to store all the results into "correlations" to output it to a csv. both pearson and spearman were used as correlation testing because we were finding relations between data variables 
+correlations = pd.DataFrame(correlation_rows)
+correlations.to_csv(TABLE_FOLDER / "municipality_correlations.csv", index=False)
+
+# Precipitation vs crashes plots using lmplot is below. most of the code was gotten from the seabron docs website (source: https://seaborn.pydata.org/generated/seaborn.lmplot.html#seaborn.lmplot)
+
+precip_plot = sns.lmplot(
+    data=precip_data,
+    x="total_precip_mm",
+    y="total_crashes",
+    col="municipality",
+    col_wrap=2,
+    height=4,
+    scatter_kws={"alpha": 0.7}
+)
+precip_plot.set_axis_labels("Monthly Precipitation (mm)", "Reported Crashes")
+precip_plot.fig.suptitle("Monthly Precipitation vs Reported Crashes", y=1.03)
+precip_plot.savefig(FIGURE_FOLDER / "precipitation_vs_crashes.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+
+# Temperature vs crashes plots using lmplot as well 
+
+temp_plot = sns.lmplot(
+    data=combined,
+    x="mean_temp_c",
+    y="total_crashes",
+    col="municipality",
+    col_wrap=2,
+    height=4,
+    scatter_kws={"alpha": 0.7},
+)
+temp_plot.set_axis_labels("Monthly Mean Temperature (°C)", "Reported Crashes")
+temp_plot.fig.suptitle("Monthly Mean Temperature vs Reported Crashes", y=1.03)
+temp_plot.savefig(FIGURE_FOLDER / "temperature_vs_crashes.png", dpi=300, bbox_inches="tight")
+plt.close()
+
+# now we will need to run 2 linear regressions (explained below). Both LR use the following model: (Model = precipitation + temperature + municipality + year)
+#
+#   * LR1 (total_crashes) --> we want to figure out how the "Model" is associated with the number of reported crashes
+#   * LR2 (total_victims) --> we want to figure out how the "Model" is associated with the number of crash victims
+#
+# the regression helper will then return 4 things which are
+#   * crash_regression = contains the model coefficients
+#   * crash_r2 = R squared, variation in crashes
+#   * crash_rmse (root mean squared error) = prediction error
+#   * crash_n = #observations used in regress
+#
+# Essentially what im trying to do is: fit the same weather model 2 times (explaining crash freq and explain victim totals), and then saving the coef's of each to compare how predictors relate to both outcomes
+
+crash_regression, crash_r2, crash_rmse, crash_n = (run_regression(precip_data, "total_crashes"))
+crash_regression.to_csv(TABLE_FOLDER / "crash_regression_coefficients.csv", index=False)
+
+victim_regression, victim_r2, victim_rmse, victim_n = (run_regression(precip_data, "total_victims"))
+victim_regression.to_csv(TABLE_FOLDER / "victim_regression_coefficients.csv", index=False)
+
+#---
+# run the mannwhitneyu tests on all cities using a for loop to figure out RQ4 which was "Do wetter months have different crash counts than drier months?". output the result in a catplot using violinplot
+#---
+
+# declare the empty lists to store the test results and cit wet/dry data 
+mann_whitney_rows = []
+wet_dry_data = []
+
+for municipality in MUNICIPALITIES:
+
+    city = precip_data[precip_data["municipality"] == municipality].copy() # sift through the cities
+    median_precipitation = city["total_precip_mm"].median() # calculate the median precipitation  of the cities (middle value)
+    city["precipitation_group"] = np.where(city["total_precip_mm"] >= median_precipitation, "WET", "DRY") # created a new column called "precipitation_group" where we label each month as wet or dry, relative to the city's median precip
+
+    wet = city.loc[city["precipitation_group"] == "WET", "total_crashes"] # extracts the crash counts for the wet and dry month groups
+    dry = city.loc[city["precipitation_group"] == "DRY", "total_crashes"]
+
+    statistic, p_value = mannwhitneyu(wet, dry, alternative="two-sided") # compare the wet month and fry month crash counts to see if the two groups differ in any way (aka 2 sided test). mannwhintey was useful because we are comparing 2 groups
+
+    # builds a dictionary which contains each city's results, and appends it to the list we declared above "mann_whitney_rows = []"
+    mann_whitney_rows.append({
+        "municipality": municipality,
+        "median_precipitation_mm": median_precipitation,
+        "wet_months": len(wet),
+        "dry_months": len(dry),
+        "wet_mean_crashes": wet.mean(),
+        "dry_mean_crashes": dry.mean(),
+        "mann_whitney_u": statistic,
+        "p_value": p_value
+    })
+
+    wet_dry_data.append(city) # keep the labeled city data so all the cities can be plotted together
+
+
+mann_whitney_results = pd.DataFrame(mann_whitney_rows) # convert the test summaries into a pandas DF table and save it to TABLE_FOLDER
+mann_whitney_results.to_csv(TABLE_FOLDER / "mann_whitney_wet_vs_dry.csv", index=False)
+
+wet_dry_data = pd.concat(wet_dry_data, ignore_index=True) # combine all the city-level wet/dry data into one dataframe so we can plot it in the next step
+
+# Violin plot is used to describe the data returned by the mannwhitneyu stat codes as a visual comparison 
+
+wet_dry_plot = sns.catplot(
+    data=wet_dry_data,
+    x="precipitation_group",
+    y="total_crashes",
+    col="municipality",
+    col_wrap=2,
+    kind="violin",
+    order=["DRY", "WET"],
+    inner="box",
+    height=4
+)
+wet_dry_plot.set_axis_labels("Month Classification", "Reported Crashes")
+wet_dry_plot.fig.suptitle("Crash Distributions in Drier and Wetter Months", y=1.03)
+wet_dry_plot.savefig(FIGURE_FOLDER / "wet_vs_dry_violin.png", dpi=300, bbox_inches="tight")
+plt.close()
