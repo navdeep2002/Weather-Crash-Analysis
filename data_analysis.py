@@ -181,3 +181,50 @@ plt.xlabel("Year")
 plt.ylabel("Total Reported Crashes")
 plt.xticks([2021, 2022, 2023, 2024])
 save_figure("annual_crashes_by_municipality.png") # invokes the save_figure helper we made 
+
+# now we move on the rq2 which is below: 
+#
+# Research Question 2.) How do the crash counts vary by month's and season's?
+#---
+
+# group and aggregate the cities by month and calculate the mean of the total crashes
+monthly_pattern = (
+    combined.groupby(
+        ["municipality", "month"],
+        as_index=False,
+        observed=True
+    )
+    ["total_crashes"].mean()
+)
+
+# 
+monthly_pattern["month_name"] = (monthly_pattern["month"].map(MONTH_NAMES)) # the map function here is for pandas.series.map since it goes row by row because we selected on column (month_name)
+monthly_pattern.to_csv(TABLE_FOLDER / "monthly_crash_pattern.csv", index=False) # output the results to a table csv in the mentioned folder
+
+# plotting information below; uses seaborn lineplot (source: https://seaborn.pydata.org/generated/seaborn.lineplot.html#seaborn-lineplot)
+plt.figure(figsize=(11, 6))
+sns.lineplot(data=monthly_pattern, x="month", y="total_crashes", hue="municipality", marker="o")
+plt.title("Average Monthly Reported Crashes by Municipality")
+plt.xlabel("Month")
+plt.ylabel("Average Monthly Crashes")
+plt.xticks(range(1, 13), [MONTH_NAMES[i] for i in range(1, 13)]) # creates tick markers from 1-12 using a for loop, I had to search how to compress the for loop so it can be a one liner
+save_figure("monthly_crash_pattern.png") # call the helper function
+
+
+# Seasonal patterns aggregation and plotting below
+seasonal_pattern = (
+    combined.groupby(
+        ["municipality", "season"],
+        as_index=False,
+        observed=True
+    )
+    ["total_crashes"].mean()
+)
+seasonal_pattern.to_csv(TABLE_FOLDER / "seasonal_crash_pattern.csv", index=False)
+
+plt.figure(figsize=(10, 6))
+sns.barplot(data=seasonal_pattern, x="season", y="total_crashes", hue="municipality") # source: https://seaborn.pydata.org/generated/seaborn.barplot.html#seaborn.barplot
+plt.title("Average Monthly Crashes by Season")
+plt.xlabel("Season")
+plt.ylabel("Average Monthly Crashes")
+save_figure("seasonal_crash_pattern.png")
